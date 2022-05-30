@@ -1,0 +1,309 @@
+---
+title: "STA130 Final Project"
+author: "Project Group 45: Harriet Zhu (1006678150), Yichen Jiang (1006851355), Runshi Yang (1006734223), Yu Zhang (1006764592)"
+subtitle: "Investigating rating of the Liberal Party from three social perspectives"
+date: December 7, 2020
+output: 
+  beamer_presentation:
+    theme: "AnnArbor"
+    colortheme: "dolphin"
+    fonttheme: "serif"
+    slide_level: 2
+---
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# echo=FALSE will stop the code chunk from appearing in the knit document
+# warning=FALSE and message=FALSE will stop R messages from appearing in the knit document
+library(tidyverse)
+
+# the data is not in the csv form we usually use, but in an R format, .rds.
+# the following line saves it as ces19 and you can work with it as you're used to now
+ces19 <- readRDS("ces19.rds")
+
+
+# see the project information page for more information: https://q.utoronto.ca/courses/184002/pages/project
+
+```
+
+
+## Introduction
+
+In this project, we will be giving advice to Canada’s **Liberal Party**, which is the federal political party that currently rules the country. In order to do this, we would analyzed variables from the data *the 2019 Online Canadian Election Survey*. Our suggestions will based on the ratings of the Liberal party from raters categorized by three different perspectives: education, job and sexuality.\
+
+i) **Education**: how would individuals who have bachelor's degree or above rate Liberal party.\
+ii) **Job**: whether there is a difference in the rating of the party between the working individuals and people who have already been retired.\
+iii) **Sexuality**: whether there is an association between sexuality of raters and rating of Liberal party.
+
+
+## Objectives
+
+Specifically, these are the **three** questions that we are interested in:\
+
+1. What is **the range of plausible values** for the average rating of Liberal party from individuals with a bachelor's degree or above?\
+2. Is the average rating of Liberal Party **similar** between raters aged 18 to 65 and raters aged 65 to 99?\
+3. Is there an **association** between sexuality of raters and rating of Liberal party? 
+
+
+## Question 1: Data Summary
+
+\small
+
+For Q1 \textcolor{blue}{(What is the range of plausible values for the average rating of Liberal party from individuals with a bachelor's degree or above?)}, we cleaned the data by removing all the NAs in *education* and *party_rating_23* variables. Also, by filtering education, we found that there are 13069 out of 35176 Canadian voters who had bachelor's degree or above.\
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3.3}
+data_q1 <- ces19 %>%
+  select(education,party_rating_23)
+
+data_q1 <- data_q1 %>% filter(!is.na(party_rating_23) & !is.na(education))
+
+data_q1 %>% 
+  ggplot(aes(x=education,y=party_rating_23)) + 
+  geom_boxplot( color="mediumorchid", fill="plum") + 
+  labs(x="education", 
+       y="party rating", 
+       title="Fig1. Rating of Liberal party for different levels of education")+
+  coord_flip()
+
+data_filtered_q1 <- data_q1 %>%
+  filter(education=="Master's degree" | education=="Bachelor's degree" | education=="Professional degree or doctorate")
+```
+
+We are interested in the rating of individuals with bachelor's degree or above because their median ratings are relatively higher from *fig1*.
+
+## Question 1: Statistical Methods
+
+\small
+
+Our sample is the individuals who rated for Liberal party who had bachelor's degree or above.\
+\
+
+\scriptsize
+*Mean rating of the Liberal Party from individuals with a bachelor's degree or above*\
+\small
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3}
+data_filtered_q1 %>%
+  summarise(mean(party_rating_23))
+```
+
+We first calculate the sample statistic of 55.507 by getting the mean rating of 13069 individuals who had bachelor's degree or above. Then, we use a **bootstrap method** to investigate the problem. This means that we take out many bootstrap samples of size of the observations (n = 13069), with replacement, from the original sample.\
+
+We then simulate 1000 bootstrap samples and calculate the average party rating (Liberal Party) of individuals with a bachelor's degree or above for every bootstrap sample.\
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+set.seed(150) 
+sample_p <- rep(NA, 1000)
+
+for(i in 1:1000){
+  sample <- data_filtered_q1 %>%
+    sample_n(size=13069,replace = TRUE)
+  sample_p[i] <- as.numeric(sample%>%
+                              summarise(mean(party_rating_23)))
+}
+```
+
+
+## Question 1: Results
+
+We calculate a 95% confidence for our sampling distribution of the mean rating for the Liberal party from individuals who had bachelor's degree or above.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3}
+sample_p <- tibble(xmean=sample_p)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+quantile(sample_p$xmean,c(0.025,0.975))
+```
+
+The result shows that we're 95% confident that the mean average party rating (Liberal Party) of raters with a bachelor's degree or above is between 55.01329 and 56.03571, which means raters with bachelor’s degree or above tend to give a higher rating than others, compared to the overall average party rating of 48.3625.
+
+
+## Question 2: Data Summary
+
+\small
+
+We cleaned the data by removing all the NAs in *age* and *party_rating_23* variables for Q2 \textcolor{blue}{(Is the average rating of Liberal Party similar between raters aged 18 to 65 and raters aged 65 to 99?)}. Since the minimum retirement age of Canada is 65, we created a variable called *age_group* and set the value to ‘working’ for the observations between 18 and 60 and ‘retired’ for those above 65. Then, we plotted a set of boxplots (*fig2*) to show the distributions of ratings of the two groups.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+cleaned_data_q2 <- ces19 %>%
+  filter(!is.na(age) & !is.na(party_rating_23)) %>%
+  mutate(age_group = case_when(18 <= age & age <= 65 ~ "working",
+                               65 < age ~ "retired"))
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=4}
+ggplot(data = cleaned_data_q2, aes(x = age_group, y = party_rating_23)) +
+      geom_boxplot(color= 'mediumorchid', fill='plum') +
+      labs(y = 'rating for Liberal Party',
+           x = 'age groups',
+           title= "Fig2. Rating of Liberal party for 'working' and 'retired' groups")
+```
+
+## Question 2: Statistical Methods
+
+We use a **two-sample hypothesis test** to compare the average rating of the party between the two groups. The null and alternative hypotheses are listed below:
+
+\begin{itemize}
+  \item $H_0: \mu_{working} - \mu_{retired} = 0$: there is no difference in the average rating of Liberal party between people who are working and retired individuals.
+  \item $H_1: \mu_{working} - \mu_{retired} \neq 0$: the average rating of Liberal party is different between people who are working and retired individuals.
+\end{itemize}
+
+To get the test statistic, we calculate the difference between the average rating in two groups, and then simulate under the null hypothesis, that is, shuffle the values to get the distribution of the differences in the average rating of two groups. 
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+group_means <- cleaned_data_q2 %>%
+    group_by(age_group) %>%
+  summarise(means = mean(party_rating_23))
+
+diff_means <- group_means %>%
+  summarise(test_stat = diff(means))
+
+set.seed(223)
+repetitions = 1000
+simulated_values <- rep(NA, repetitions)
+
+for(i in 1:repetitions){
+  simdata_q2 <- cleaned_data_q2 %>%
+    mutate(age_group = sample(age_group))
+  
+  sim_value_q2 <-simdata_q2 %>%
+    group_by(age_group) %>%
+    summarise(means = mean(party_rating_23)) %>%
+    summarise(value = diff(means))
+  
+  simulated_values[i] <- as.numeric(sim_value_q2)
+}
+
+sim_q2 <-tibble(mean_diff = simulated_values)
+```
+
+
+## Question 2: Results
+
+Finally, we evaluate the evidence against the null hypothesis and make a conclusion based on the p-value calculated.
+
+\scriptsize
+*P-value calculated*\
+\normalsize
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3}
+num_more_extreme <- sim_q2 %>%
+  filter(abs(mean_diff) >= abs(diff_means$test_stat)) %>%
+  summarise(n())
+
+p_value <- as.numeric(num_more_extreme / repetitions)
+p_value
+```
+
+
+We have a **p-value** of 0.983 that 98.3\% of our simulations under the null hypothesis were same or more extreme than our test statistic. 
+
+This means we have no evidence against the null hypothesis that there is no difference between the mean rating between the working and retired people, which indicates that **Liberal party's rating did not differ between working people and retired people**.
+
+
+## Question 3: Data Summary
+
+For Q3 \textcolor{blue}{(Is there an association between sexuality of raters and rating of Liberal party?)}, we also removed all the NAs in *party_rating_23* variable and "Prefer not to say""Don't know" in *sexuality* variable. We then created a variable called *sexuality_group*. We set observations with Heterosexual sexuality into "heterosexual" category and observations with other sexualities into "others" category because heterosexual is still a major sexuality. Then, we picked out the variables we needed.
+
+\scriptsize
+*A summary table of no. of observations in different sexuality groups and their median ratings of the Liberal Party.*\
+\normalsize
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3}
+cleaned_data_q3 <- ces19 %>%
+  filter(!is.na(party_rating_23))%>%
+  filter(!sexuality=="Prefer not to say")%>%
+  filter(!sexuality=="Don't know")%>%
+  mutate(sexuality_group=case_when(sexuality=="Heterosexual"~"heterosexual",
+                                   sexuality=="Homosexual"~"others",
+                                   sexuality=="Bisexual"~"others",
+                                   sexuality=="Other"~"others"))
+cleaned_data_q3 %>%
+  group_by(sexuality_group)%>%
+  summarise(n=n(),
+            median_rate=median(party_rating_23))
+```
+
+
+## Question 3: Statistical Methods
+
+
+We use a **simple linear regression model** to predict the association between sexuality groups and average rating of Liberal Party. Since the sexuality group is a categorical variable, this fitted linear regression model has a categorical predictor. 
+$$LPsupportrate_i = \beta_{0} + \beta_{1}group_i + \epsilon_i$$
+\small
+- $LPsupportrate_i$ is the **response variable** which means the rating of Liberal Party of $ith$ selected individual.\
+- $group_i$ is the **predictor variable** which stands for the sexuality groups of voters. The baseline value is group 'heterosexual' = 0 and group 'other' = 1\
+- ${\beta}_0$ is the **y-intercept** of the linear regression model and the **estimated mean rating** for Liberal party from the heterosexual group.\
+- ${\beta}_1$is the **gradient** of the modal and **average difference** in the response variable y between two groups.\
+
+---
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=4}
+cleaned_data_q3 %>%
+  ggplot(aes(x=sexuality_group,y=party_rating_23)) +
+  geom_boxplot(color= 'mediumorchid', fill='plum') +
+  labs(x="sexuality_groups",
+       y="Rating of Liberal Party",
+       title="Fig3. Rating of Liberal party between different sexuality groups")
+```
+
+After seeing the differences in *fig3*, we then carry out a **hypothesis test** for our fitted regression model:
+
+\begin{itemize}
+  \item $H_0: \beta_1 = 0$: there is no difference in rating of Liberal Party between heterosexual group and group of other sexualities.
+  \item $H_1: \beta_1 \neq 0$: there is a difference in rating between heterosexual group and group of other sexualities.
+\end{itemize}
+
+
+## Question 3: Results
+
+\footnotesize
+*A summary table of the coefficients of the linear regression model.*\
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+model1 <- lm(party_rating_23 ~ sexuality_group, data = cleaned_data_q3)
+summary(model1)$coefficient
+```
+
+\small
+According to the summary table, ${\beta}_0$ is about 47.49, which shows the estimated mean rating for liberal party from the heterosexual group, and the estimated mean rating of liberal party for other sexualities (${\beta}_0+{\beta}_1$) will be 55.59. \
+
+\
+
+Furthermore, the **p-value** is very small ($1.3935\times 10^{-41}$) in this model, so we have strong evidence against the null hypothesis that the rating of Liberal party is the same for heterosexual voters and other sexualities. **Therefore, there is an association between sexuality of voters and the rating of the Liberal party.**  
+
+## Conclusions & Limitations
+
+\small
+
+Based on the three questions that we investigated, here are the **conclusions** and **suggestions** that we would like to inform:
+
+\footnotesize
+
+### Question 1:
+
+The result implies that when making policies, Liberal party should be aware of the welfare of those who are poorly educated and provide them the equal opportunity of schooling.\
+**Limitation**: There are 2646 people who chose not to give their education information, which may lead to a slightly skewed result. Also, people who attended “some university” have relatively higher party ratings as well -- including them in the study may influence the result.
+
+### Question 2:
+
+Through our analysis, we found that Liberal Party's rating did not differ between working people and retired people, indicating that the current policy is relatively fair to both groups of people.
+
+## Conclusions & Limitations
+
+\footnotesize
+
+### Question 2:
+
+(Cont.) If a new policy is to be implemented, it is better to take care of both groups of people, otherwise it may lead to dissatisfaction.\
+**Limitation**: We cannot tell whether a person is working or not accurately just based on the age, for example, individuals may still be willing to work even they are above 65 years old.
+
+### Question 3:
+
+Liberal Party gains higher rating from sexuality groups other than heterosexual. This may reveal that Liberal party have great LGBT policy to appeal voters who are homosexual, bisexual, or belong to other minor sexuality groups, and they should keep it in order to gain more votes.\
+**Limitation**: Since a number of participants have chosen "prefer not to answer" and some of the participants' sexuality is not known, the result will be different if the information is considered.\
+
+## Conclusions & Limitations
+
+Overall, we investigated about the **rating of Liberal party** from three social perspectives. A general limitation is that the party rating may not totally indicate the vote choice of individuals. For example, individuals who give a high rating to the Liberal Party may not vote for it eventually. Therefore, we still need to investigate about vote choices further. \
+\
+
+However, the ratings do indicate **preferences**, and differences in rating from different groups surely help the party to keep or adjust their policies, in order to win more votes from more groups.
+
